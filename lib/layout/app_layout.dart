@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:todo_app/core/enums.dart';
+import 'package:todo_app/models/task/task.dart';
+import 'package:todo_app/models/task/tasks_cubit.dart';
+import 'package:todo_app/models/task/tasks_states.dart';
+import 'package:todo_app/widgets/new_task_form.dart';
 
 import '../screens/archived_tab.dart';
 import '../screens/completed_tab.dart';
@@ -21,7 +26,7 @@ class _AppLayoutState extends State<AppLayout> {
   final _timeDateController = TextEditingController();
 
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  final _tabs = const [
+  final _tabs = [
     TasksTab(),
     CompletedTab(),
     ArchivedTab(),
@@ -33,70 +38,50 @@ class _AppLayoutState extends State<AppLayout> {
     'Archived Tasks',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    BlocProvider.of<TasksCubit>(context).getTasks();
+  }
+
+  bool validateForm() {
+    if (_titleController.text.isEmpty ||
+        _timeDateController.text.isEmpty ||
+        _dayDateController.text.isEmpty) {
+      return false;
+    }
+    return true;
+  }
+
+  void addNewTask() {
+    if (validateForm()) {
+      final addedTask = Task(
+          title: _titleController.text,
+          id: DateTime.now().toString(),
+          date: _dayDateController.text,
+          time: _timeDateController.text,
+          status: TaskStatus.newTask);
+      BlocProvider.of<TasksCubit>(context).addNewTask(addedTask: addedTask);
+      _closeBottomSheet();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please complete missing data'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
   void displayBottomSheet() {
     setState(() {
       _isSheetOpened = true;
     });
-    _scaffoldKey.currentState!.showBottomSheet((_) => Padding(
-          padding: const EdgeInsets.all(10.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DefaultTextField(
-                textController: _titleController,
-                label: 'Title',
-                hint: 'Do homework...',
-                preIcon: Icons.title,
-                onSubmitted: (value) {},
-                onTap: () {},
-              ),
-              DefaultTextField(
-                textController: _timeDateController,
-                label: 'Time of the day',
-                preIcon: Icons.timelapse,
-                onSubmitted: (value) {},
-                onTap: () async {
-                  FocusScope.of(context).requestFocus(FocusNode());
-                  // Show Time Picker
-                  final timeOfDay = await displayTimePicker();
-                  print(timeOfDay);
-                  if (timeOfDay != null && mounted) {
-                    _timeDateController.text = timeOfDay.format(context);
-                  }
-                },
-              ),
-              DefaultTextField(
-                textController: _dayDateController,
-                label: 'Date',
-                preIcon: Icons.calendar_month,
-                onSubmitted: (value) {},
-                onTap: () async {
-                  FocusScope.of(context).requestFocus(FocusNode());
-                  // Show Date Picker
-                  final date = await displayDatePicker();
-                  print(date);
-                  if (date != null) {
-                    _dayDateController.text = DateFormat.yMMMd().format(date);
-                  }
-                },
-              ),
-            ],
-          ),
+    _scaffoldKey.currentState!.showBottomSheet((_) => NewTaskForm(
+          dateController: _dayDateController,
+          timeOfDayController: _timeDateController,
+          titleController: _titleController,
         ));
-  }
-
-  Future<TimeOfDay?> displayTimePicker() async {
-    final timeDay =
-        await showTimePicker(context: context, initialTime: TimeOfDay.now());
-    return timeDay;
-  }
-
-  Future<DateTime?> displayDatePicker() async {
-    return await showDatePicker(
-        context: context,
-        initialDate: DateTime.now(),
-        firstDate: DateTime.now(),
-        lastDate: DateTime(2100));
   }
 
   void _closeBottomSheet() {
@@ -120,7 +105,25 @@ class _AppLayoutState extends State<AppLayout> {
       appBar: AppBar(
         title: Text(_appBarTitles[_currentTabIndex]),
       ),
-      body: _tabs[_currentTabIndex],
+      body: BlocBuilder<TasksCubit, TasksState>(
+        buildWhen: (prev, current) => current is TasksFetchingStates,
+        builder: (context, state) {
+          if (state is TasksLoadingState) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          if (state is TasksFailedToLoadedState) {
+            return Center(
+              child: Text(
+                'Something went wrong!!!',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            );
+          }
+          return _tabs[_currentTabIndex];
+        },
+      ),
       // body: Center(
       //   child: Column(
       //     children: [
@@ -142,7 +145,7 @@ class _AppLayoutState extends State<AppLayout> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           if (_isSheetOpened) {
-            _closeBottomSheet();
+            addNewTask();
           } else {
             displayBottomSheet();
           }
@@ -158,42 +161,6 @@ class _AppLayoutState extends State<AppLayout> {
           BottomNavigationBarItem(icon: Icon(Icons.archive), label: 'Archived'),
         ],
       ),
-    );
-  }
-}
-
-class DefaultTextField extends StatelessWidget {
-  const DefaultTextField({
-    super.key,
-    required this.textController,
-    required this.label,
-    required this.preIcon,
-    this.onTap,
-    this.onSubmitted,
-    this.hint,
-  });
-
-  final TextEditingController textController;
-  //final void Function()? onTap;
-  final VoidCallback? onTap;
-  final void Function(String)? onSubmitted;
-  final String label;
-  final String? hint;
-  final IconData preIcon;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: textController,
-      onTap: onTap,
-      autocorrect: false,
-      onChanged: (value) {
-        print('onChanged called: $value');
-      },
-      onSubmitted: onSubmitted,
-      keyboardType: TextInputType.text,
-      decoration: InputDecoration(
-          prefixIcon: Icon(preIcon), label: Text(label), hintText: hint),
     );
   }
 }

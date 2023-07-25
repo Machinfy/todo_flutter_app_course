@@ -7,27 +7,32 @@ abstract class TasksState {}
 class TaskInitialState extends TasksState {}
 
 // Fetching Tasks State
-class TasksLoadedSuccessfullyState extends TasksState {
+
+abstract class TasksFetchingStates extends TasksState {}
+
+class TasksLoadedSuccessfullyState extends TasksFetchingStates {
   final List<Task> tasks;
 
   TasksLoadedSuccessfullyState({required this.tasks});
 }
 
-class TasksFailedToLoadedState extends TasksState {
+class TasksFailedToLoadedState extends TasksFetchingStates {
   final String failMsg;
 
   TasksFailedToLoadedState({required this.failMsg});
 }
 
-class TasksLoadingState extends TasksState {}
+class TasksLoadingState extends TasksFetchingStates {}
 
 // Managing Tasks State
-class TasksTaskManagedSuccessfullyState extends TasksState {
+abstract class TasksManagingStates extends TasksState {}
+
+class TasksTaskManagedSuccessfullyState extends TasksManagingStates {
   final OperationType operationType;
   TasksTaskManagedSuccessfullyState({required this.operationType});
 }
 
-class TasksTaskFailedToManageState extends TasksState {
+class TasksTaskFailedToManageState extends TasksManagingStates {
   final OperationType operationType;
   final String failMsg;
   TasksTaskFailedToManageState(
